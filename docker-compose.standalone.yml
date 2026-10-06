@@ -1,0 +1,20 @@
+# Sobe só o frontend, para quando o backend já está rodando em outro lugar
+# (por exemplo, com "make docker-up" no repositório do backend).
+#
+#   docker compose -f docker-compose.standalone.yml up -d --build
+#
+# Por padrão aponta para a API exposta no host (porta 8080).
+
+services:
+  frontend:
+    build:
+      context: .
+    image: workshop-frontend:local
+    container_name: workshop-frontend
+    environment:
+      BACKEND_URL: ${BACKEND_URL:-http://host.docker.internal:8080}
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

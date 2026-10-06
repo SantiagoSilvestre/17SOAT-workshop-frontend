@@ -1,0 +1,29 @@
+# Sobe o frontend junto com a stack completa do backend
+# (API Spring Boot + MySQL + simulador de fornecedor).
+#
+# Pré-requisito: o repositório do backend clonado ao lado deste, ou o caminho
+# dele em BACKEND_PATH no arquivo .env. Veja o README para os detalhes.
+#
+#   docker compose up -d --build
+#
+# Frontend: http://localhost:3000  ·  API: http://localhost:8080
+
+include:
+  - path: ${BACKEND_PATH:-../17SOAT-workshop-management-system}/docker-compose.yml
+
+services:
+  frontend:
+    build:
+      context: .
+    image: workshop-frontend:local
+    container_name: workshop-frontend
+    environment:
+      BACKEND_URL: ${BACKEND_URL:-http://app:8080}
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      app:
+        condition: service_started
+    networks:
+      - workshop-network
+    restart: unless-stopped
