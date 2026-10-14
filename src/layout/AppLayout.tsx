@@ -4,6 +4,7 @@ import { IconChevronDown, IconLogout, IconTool } from '@tabler/icons-react';
 import { NavLink as RouterNavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useSession } from '@/auth/AuthContext';
 import { hasAnyRole, ROLE_LABELS } from '@/auth/roles';
+import { useSessionExpiryWarning } from '@/auth/useSessionExpiryWarning';
 import { MODULES } from '@/routes/modules';
 
 export function AppLayout() {
@@ -12,6 +13,7 @@ export function AppLayout() {
   const { logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  useSessionExpiryWarning(session);
 
   // Saída voluntária vai direto para o login, sem lembrar a página atual
   // (quem entrar depois pode ter outro papel).

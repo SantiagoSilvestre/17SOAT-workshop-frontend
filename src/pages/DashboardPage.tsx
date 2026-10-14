@@ -22,7 +22,7 @@ export function DashboardPage() {
               <ThemeIcon variant="light" size="lg" radius="md">
                 <module.icon size={20} />
               </ThemeIcon>
-              {module.phase > 1 && (
+              {!module.page && (
                 <Badge variant="outline" color="gray" size="sm">
                   Em breve
                 </Badge>

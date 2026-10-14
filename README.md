@@ -23,6 +23,7 @@ orçamentos, execução, estoque, compras e relatórios.
 - [Usuários de teste](#usuários-de-teste)
 - [Variáveis de ambiente](#variáveis-de-ambiente)
 - [Autenticação e papéis](#autenticação-e-papéis)
+- [Catálogo de serviços](#catálogo-de-serviços)
 - [Estrutura do projeto](#estrutura-do-projeto)
 - [Scripts](#scripts)
 - [Testes e CI](#testes-e-ci)
@@ -34,7 +35,7 @@ orçamentos, execução, estoque, compras e relatórios.
 
 ## Situação atual
 
-Esta é a **fase 1** (fundação). Já funciona:
+A **fase 1** (fundação) está pronta e a **fase 2** (cadastros) começou pelo catálogo de serviços. Já funciona:
 
 - Login com usuário e senha usando o JWT emitido pelo backend (`POST /api/auth/login`).
 - Sessão persistida no navegador e encerrada automaticamente quando o token expira (1 hora, sem refresh no backend)
@@ -45,8 +46,11 @@ Esta é a **fase 1** (fundação). Já funciona:
 - Cliente HTTP único que envia o token, entende o formato de erro do backend (`{ code, message }`) e repassa
   parâmetros de lista no formato que a API espera (`?type=PART&type=SUPPLY`).
 - Imagem Docker de produção (Nginx) e `docker-compose` que sobe frontend e backend juntos.
+- Aviso na tela 5 minutos antes de a sessão expirar.
+- **Catálogo de serviços**: listar, buscar, ordenar, cadastrar, renomear, mudar o preço base e arquivar
+  (veja [Catálogo de serviços](#catálogo-de-serviços)).
 
-Os demais módulos já aparecem no menu com a etiqueta **Em breve** e ganham telas nas próximas fases
+Os demais módulos já aparecem no menu, com a etiqueta **Em breve** no painel, e ganham telas nas próximas fases
 (veja o [roteiro](#roteiro-de-entrega)).
 
 ## Tecnologias
@@ -136,6 +140,7 @@ simulador de fornecedor e o frontend.
    | API (direto)                  | http://localhost:8080                       |
    | Swagger da API                | http://localhost:8080/swagger-ui.html       |
    | Simulador de fornecedor       | http://localhost:8089                       |
+   | Mailpit (e-mails enviados aos clientes) | http://localhost:8025             |
    | MySQL                         | `localhost:3306` (usuário `workshop_user`)  |
 
 5. Comandos úteis:
@@ -222,7 +227,8 @@ continuam valendo e podem ir no mesmo `.env`. Veja o `.env.example` do backend.
 3. O frontend guarda **só o token e o nome de usuário** no `localStorage` e lê as claims para montar a interface.
    A assinatura é validada apenas pelo backend.
 4. Toda chamada leva `Authorization: Bearer <token>`. Se a API responder `401`, a sessão é encerrada e o usuário
-   volta para o login. Um temporizador também encerra a sessão no horário de expiração do token.
+   volta para o login. Um temporizador também encerra a sessão no horário de expiração do token, e 5 minutos antes
+   aparece um aviso para o usuário salvar o que estiver fazendo.
 5. Depois do login o usuário volta para a página que tentou abrir.
 
 Permissões por módulo (baseadas no `SecurityConfig` do backend):
@@ -232,7 +238,7 @@ Permissões por módulo (baseadas no `SecurityConfig` do backend):
 | Painel                |   ✓   |    ✓    |     ✓      |    ✓     |
 | Clientes              |   ✓   |    ✓    |            |          |
 | Veículos              |   ✓   |    ✓    |            |          |
-| Catálogo de serviços  |   ✓   |    ✓    |            |          |
+| Catálogo de serviços  |   ✓   |    ✓    | só consulta | só consulta |
 | Técnicos              |   ✓   |    ✓    |            |          |
 | Usuários              |   ✓   |         |            |          |
 | Ordens de serviço     |   ✓   |    ✓    |     ✓      |          |
@@ -246,6 +252,31 @@ A tabela fica em um só lugar no código: [`src/routes/modules.ts`](src/routes/m
 proteção das rotas são gerados a partir dela. A proteção no frontend é só de usabilidade; quem garante a segurança
 é sempre o backend.
 
+## Catálogo de serviços
+
+Tela em `/catalogo` com os serviços que a oficina oferece e o preço base de cada um. Esse preço é o ponto de partida
+dos itens do diagnóstico e do orçamento nas próximas fases.
+
+![Catálogo de serviços](docs/screenshots/catalogo.png)
+
+| Ação                 | Endpoint                                     | Quem pode       |
+| -------------------- | -------------------------------------------- | --------------- |
+| Listar               | `GET /api/catalog-services`                  | qualquer papel  |
+| Cadastrar            | `POST /api/catalog-services`                 | ADMIN, MANAGER  |
+| Renomear             | `PATCH /api/catalog-services/{id}`           | ADMIN, MANAGER  |
+| Mudar o preço base   | `PATCH /api/catalog-services/{id}/base-price`| ADMIN, MANAGER  |
+| Arquivar             | `DELETE /api/catalog-services/{id}`          | ADMIN, MANAGER  |
+
+- A API não tem regra de papel para o catálogo e aceita edição de qualquer usuário logado. A tela libera a consulta
+  para todos, mas mostra os botões de edição só para ADMIN e MANAGER.
+- A listagem da API traz só os serviços ativos e não pagina. Busca (sem diferenciar acentos), ordenação e paginação
+  são feitas no navegador.
+- Editar é um formulário só, mas a API tem uma rota para o nome e outra para o preço. O frontend chama apenas a que
+  mudou.
+- Arquivar não tem volta pela API: o serviço some da lista e não há rota para reativá-lo.
+- O preço é enviado como `{ "value": 1234.5, "currency": "BRL" }`, com no máximo duas casas decimais.
+- Nome repetido volta como `409 CATALOG_SERVICE_NAME_ALREADY_EXISTS` e aparece como erro no próprio campo.
+
 ## Estrutura do projeto
 
 ```
@@ -258,19 +289,29 @@ proteção das rotas são gerados a partir dela. A proteção no frontend é só
 ├── src/
 │   ├── api/
 │   │   ├── http.ts               # cliente HTTP: token, erros { code, message }, query params
-│   │   └── auth.ts               # chamadas de autenticação
+│   │   ├── auth.ts               # chamadas de autenticação
+│   │   └── catalogServices.ts    # catálogo: chamadas, tipos e hooks do TanStack Query
 │   ├── auth/
 │   │   ├── roles.ts              # papéis e rótulos em português
 │   │   ├── token.ts              # leitura das claims do JWT
 │   │   ├── session.ts            # sessão (localStorage + assinantes)
 │   │   ├── AuthContext.tsx       # contexto React: login, logout, expiração
-│   │   └── RequireAuth.tsx       # guarda de rota por autenticação e papel
+│   │   ├── RequireAuth.tsx       # guarda de rota por autenticação e papel
+│   │   └── useSessionExpiryWarning.ts # aviso de sessão perto de expirar
+│   ├── components/               # peças reutilizadas pelas telas
+│   │   ├── DataTable.tsx         # tabela com busca, ordenação e paginação no cliente
+│   │   ├── ConfirmModal.tsx      # confirmação de ações como arquivar
+│   │   ├── MoneyInput.tsx        # campo de valor em reais
+│   │   └── PageHeader.tsx        # título e descrição da página
+│   ├── features/
+│   │   └── catalog/              # tela e formulário do catálogo de serviços
+│   ├── lib/                      # dinheiro, texto e notificações
 │   ├── layout/AppLayout.tsx      # cabeçalho, menu lateral e área de conteúdo
 │   ├── pages/                    # Login, Painel, Acesso negado, 404, "Em breve"
 │   ├── routes/
 │   │   ├── modules.ts            # mapa de módulos × papéis (fonte única)
 │   │   └── router.tsx            # definição das rotas
-│   ├── test/                     # utilitários de teste (JWT falso, render com rotas)
+│   ├── test/                     # utilitários de teste (JWT falso, fetch simulado, render com rotas)
 │   ├── theme.ts                  # tema do Mantine
 │   ├── App.tsx                   # providers (Mantine, Query, Auth, Router)
 │   └── main.tsx                  # ponto de entrada
@@ -299,24 +340,28 @@ Os testes usam Vitest + Testing Library com jsdom e cobrem:
 - sessão (persistência, expiração e aviso aos assinantes);
 - cliente HTTP (token, parâmetros repetidos, conversão de erros, logout em `401`);
 - rotas: redirecionamento para o login, bloqueio por papel, menu filtrado, login com retorno à página pedida e
-  mensagem de credenciais inválidas.
+  mensagem de credenciais inválidas;
+- aviso de sessão perto de expirar;
+- tabela de listagem: ordenação, busca sem acentos e paginação;
+- catálogo: listagem, consulta sem edição para técnico, cadastro no formato da API, validação, nome repetido,
+  edição que chama só a rota do campo alterado e arquivamento com confirmação.
+
+Os testes de tela simulam a API com `mockApi` ([`src/test/api.ts`](src/test/api.ts)), que responde por
+`MÉTODO /api/caminho` e guarda as chamadas feitas para o teste conferir o corpo enviado.
 
 O GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) roda typecheck, testes e build em todo pull
 request e também verifica se a imagem Docker é construída.
 
 ## Como adicionar um módulo
 
-Exemplo para a tela de clientes (fase 2):
+O catálogo de serviços é o modelo. Para a tela de clientes, por exemplo:
 
-1. Crie as chamadas em `src/api/customers.ts` usando o cliente `http`:
-
-   ```ts
-   export const listCustomers = () => http.get<Customer[]>('/customers');
-   ```
-
-2. Crie a página em `src/pages/customers/CustomersPage.tsx`, usando `useQuery`/`useMutation` do TanStack Query.
-3. Em `src/routes/router.tsx`, troque o `ComingSoonPage` do módulo pela nova página (o `RequireAuth` com os papéis
-   continua o mesmo).
+1. Crie `src/api/customers.ts` com os tipos, as chamadas (usando o cliente `http`) e os hooks do TanStack Query,
+   como em [`src/api/catalogServices.ts`](src/api/catalogServices.ts). Mutações invalidam a lista para ela recarregar.
+2. Crie a página em `src/features/customers/CustomersPage.tsx` usando `DataTable`, `PageHeader`, `ConfirmModal` e
+   os helpers `notifySuccess`/`notifyError`.
+3. Em `src/routes/modules.ts`, aponte o campo `page` do módulo para a nova página. A rota, o menu e o painel passam a
+   usá-la (sem `page`, a rota mostra "Em breve").
 4. Se as permissões mudarem no backend, atualize `src/routes/modules.ts` e a tabela deste README.
 
 ## Roteiro de entrega
@@ -325,8 +370,8 @@ O frontend é entregue em fases, na ordem do mapa de API para telas:
 
 | Fase | Conteúdo                                                                      | Situação     |
 | :--: | ----------------------------------------------------------------------------- | ------------ |
-|  1   | Fundação: projeto, Docker, login JWT, rotas por papel, layout                 | ✅ Esta entrega |
-|  2   | Cadastros: clientes, veículos, catálogo de serviços, técnicos e usuários      | Próxima      |
+|  1   | Fundação: projeto, Docker, login JWT, rotas por papel, layout                 | ✅ Pronta    |
+|  2   | Cadastros: clientes, veículos, catálogo de serviços, técnicos e usuários      | 🚧 Catálogo pronto; clientes, veículos, técnicos e usuários a seguir |
 |  3   | Ordens de serviço (parte 1): abertura, listagem, diagnóstico, prioridade, acompanhamento | Planejada |
 |  4   | Orçamentos: geração, consulta e decisão                                       | Planejada    |
 |  5   | Execução e entrega: técnico, início, progresso, conclusão, finalização        | Planejada    |
