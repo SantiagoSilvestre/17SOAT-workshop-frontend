@@ -8,16 +8,15 @@ import { LoginPage } from '@/pages/LoginPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { MODULES } from './modules';
 
-// Cada módulo ganha uma rota protegida pelo seu papel. Enquanto a fase dele não chega,
-// a rota mostra uma página provisória; nas próximas fases basta trocar o elemento.
-const moduleRoutes: RouteObject[] = MODULES.filter((module) => module.path !== '/').map((module) => ({
-  path: module.path.slice(1),
-  element: (
-    <RequireAuth roles={module.roles}>
-      <ComingSoonPage module={module} />
-    </RequireAuth>
-  ),
-}));
+// Cada módulo ganha uma rota protegida pelo seu papel. Enquanto o módulo não tem tela
+// (campo `page` em modules.ts), a rota mostra uma página provisória.
+const moduleRoutes: RouteObject[] = MODULES.filter((module) => module.path !== '/').map((module) => {
+  const Page = module.page;
+  return {
+    path: module.path.slice(1),
+    element: <RequireAuth roles={module.roles}>{Page ? <Page /> : <ComingSoonPage module={module} />}</RequireAuth>,
+  };
+});
 
 export const routes: RouteObject[] = [
   { path: '/login', element: <LoginPage /> },

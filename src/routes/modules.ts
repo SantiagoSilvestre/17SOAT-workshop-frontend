@@ -13,7 +13,8 @@ import {
   IconUsers,
   IconUsersGroup,
 } from '@tabler/icons-react';
-import type { Role } from '@/auth/roles';
+import { STAFF_ROLES, type Role } from '@/auth/roles';
+import { CatalogPage } from '@/features/catalog/CatalogPage';
 
 export interface AppModule {
   path: string;
@@ -24,9 +25,11 @@ export interface AppModule {
   roles?: readonly Role[];
   /** Fase da entrega incremental em que o módulo ganha telas de verdade. */
   phase: number;
+  /** Tela do módulo. Sem valor, a rota mostra a página "Em breve". */
+  page?: ComponentType;
 }
 
-const STAFF: readonly Role[] = ['ADMIN', 'MANAGER'];
+const STAFF = STAFF_ROLES;
 
 /**
  * Mapa dos módulos do sistema. A navegação lateral e o painel inicial são montados a
@@ -61,8 +64,9 @@ export const MODULES: readonly AppModule[] = [
     label: 'Catálogo de serviços',
     description: 'Serviços oferecidos e preço base.',
     icon: IconTool,
-    roles: STAFF,
+    // Consulta liberada para qualquer usuário logado, como na API; só a equipe edita.
     phase: 2,
+    page: CatalogPage,
   },
   {
     path: '/tecnicos',

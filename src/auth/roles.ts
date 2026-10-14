@@ -10,6 +10,9 @@ export const ROLE_LABELS: Record<Role, string> = {
   CUSTOMER: 'Cliente',
 };
 
+/** Equipe administrativa da oficina: quem cadastra e gerencia. */
+export const STAFF_ROLES: readonly Role[] = ['ADMIN', 'MANAGER'];
+
 export function isRole(value: unknown): value is Role {
   return typeof value === 'string' && (ROLES as readonly string[]).includes(value);
 }
