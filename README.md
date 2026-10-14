@@ -24,6 +24,7 @@ orçamentos, execução, estoque, compras e relatórios.
 - [Variáveis de ambiente](#variáveis-de-ambiente)
 - [Autenticação e papéis](#autenticação-e-papéis)
 - [Catálogo de serviços](#catálogo-de-serviços)
+- [Clientes](#clientes)
 - [Estrutura do projeto](#estrutura-do-projeto)
 - [Scripts](#scripts)
 - [Testes e CI](#testes-e-ci)
@@ -35,7 +36,7 @@ orçamentos, execução, estoque, compras e relatórios.
 
 ## Situação atual
 
-A **fase 1** (fundação) está pronta e a **fase 2** (cadastros) começou pelo catálogo de serviços. Já funciona:
+A **fase 1** (fundação) está pronta e a **fase 2** (cadastros) já tem catálogo de serviços e clientes. Já funciona:
 
 - Login com usuário e senha usando o JWT emitido pelo backend (`POST /api/auth/login`).
 - Sessão persistida no navegador e encerrada automaticamente quando o token expira (1 hora, sem refresh no backend)
@@ -49,6 +50,8 @@ A **fase 1** (fundação) está pronta e a **fase 2** (cadastros) começou pelo 
 - Aviso na tela 5 minutos antes de a sessão expirar.
 - **Catálogo de serviços**: listar, buscar, ordenar, cadastrar, renomear, mudar o preço base e arquivar
   (veja [Catálogo de serviços](#catálogo-de-serviços)).
+- **Clientes**: listar, buscar por nome, CPF/CNPJ ou e-mail, cadastrar com máscaras e validação de CPF/CNPJ,
+  ver o detalhe, renomear, editar contato e endereço e arquivar (veja [Clientes](#clientes)).
 
 Os demais módulos já aparecem no menu, com a etiqueta **Em breve** no painel, e ganham telas nas próximas fases
 (veja o [roteiro](#roteiro-de-entrega)).
@@ -277,6 +280,37 @@ dos itens do diagnóstico e do orçamento nas próximas fases.
 - O preço é enviado como `{ "value": 1234.5, "currency": "BRL" }`, com no máximo duas casas decimais.
 - Nome repetido volta como `409 CATALOG_SERVICE_NAME_ALREADY_EXISTS` e aparece como erro no próprio campo.
 
+## Clientes
+
+Telas em `/clientes` (lista), `/clientes/novo` (cadastro) e `/clientes/{id}` (detalhe), para ADMIN e MANAGER.
+
+![Lista de clientes](docs/screenshots/clientes.png)
+
+![Detalhe do cliente](docs/screenshots/cliente-detalhe.png)
+
+| Ação                         | Endpoint                                   |
+| ---------------------------- | ------------------------------------------ |
+| Listar clientes ativos       | `GET /api/customers`                       |
+| Avisar documento já usado    | `GET /api/customers/identify?document=`    |
+| Ver detalhe                  | `GET /api/customers/{id}`                  |
+| Cadastrar                    | `POST /api/customers`                      |
+| Renomear                     | `PATCH /api/customers/{id}`                |
+| Editar e-mail, telefone, endereço | `PATCH /api/customers/{id}/contact-info` |
+| Arquivar                     | `DELETE /api/customers/{id}`               |
+
+- **Validações iguais às do backend**: CPF e CNPJ com dígitos verificadores, e-mail, telefone com DDD (10 ou 11
+  dígitos), CEP com 8 dígitos e UF da lista oficial. O formulário mostra o erro no campo antes de enviar.
+- **Máscaras**: o campo de documento vira CPF (`000.000.000-00`) ou CNPJ (`00.000.000/0000-00`) conforme a
+  quantidade de dígitos; telefone e CEP também são formatados enquanto se digita. A API recebe só os dígitos.
+- **Documento já cadastrado**: ao sair do campo de CPF/CNPJ, a tela consulta `identify` e mostra um link para o
+  cliente que já usa o documento. Se mesmo assim o cadastro for enviado, o `409` aparece no próprio campo.
+- **Telefone**: o backend guarda em E.164 (`+5511912345678`); a tela mostra `(11) 91234-5678`.
+- **Edição de contato** envia só os campos que mudaram, como a API espera. Um endereço já salvo pode ser alterado,
+  mas não removido, porque a API não tem essa opção.
+- **Arquivar** tira o cliente da lista e não tem volta pela API. O detalhe de um cliente arquivado continua
+  acessível, só para consulta.
+- A busca da lista funciona com o documento com ou sem máscara (`529.982` ou `52998`).
+
 ## Estrutura do projeto
 
 ```
@@ -290,7 +324,8 @@ dos itens do diagnóstico e do orçamento nas próximas fases.
 │   ├── api/
 │   │   ├── http.ts               # cliente HTTP: token, erros { code, message }, query params
 │   │   ├── auth.ts               # chamadas de autenticação
-│   │   └── catalogServices.ts    # catálogo: chamadas, tipos e hooks do TanStack Query
+│   │   ├── catalogServices.ts    # catálogo: chamadas, tipos e hooks do TanStack Query
+│   │   └── customers.ts          # clientes: chamadas, tipos e hooks
 │   ├── auth/
 │   │   ├── roles.ts              # papéis e rótulos em português
 │   │   ├── token.ts              # leitura das claims do JWT
@@ -304,8 +339,9 @@ dos itens do diagnóstico e do orçamento nas próximas fases.
 │   │   ├── MoneyInput.tsx        # campo de valor em reais
 │   │   └── PageHeader.tsx        # título e descrição da página
 │   ├── features/
-│   │   └── catalog/              # tela e formulário do catálogo de serviços
-│   ├── lib/                      # dinheiro, texto e notificações
+│   │   ├── catalog/              # tela e formulário do catálogo de serviços
+│   │   └── customers/            # lista, cadastro, detalhe e modais de clientes
+│   ├── lib/                      # dinheiro, formatos brasileiros (CPF/CNPJ, telefone, CEP), texto e notificações
 │   ├── layout/AppLayout.tsx      # cabeçalho, menu lateral e área de conteúdo
 │   ├── pages/                    # Login, Painel, Acesso negado, 404, "Em breve"
 │   ├── routes/
@@ -344,7 +380,10 @@ Os testes usam Vitest + Testing Library com jsdom e cobrem:
 - aviso de sessão perto de expirar;
 - tabela de listagem: ordenação, busca sem acentos e paginação;
 - catálogo: listagem, consulta sem edição para técnico, cadastro no formato da API, validação, nome repetido,
-  edição que chama só a rota do campo alterado e arquivamento com confirmação.
+  edição que chama só a rota do campo alterado e arquivamento com confirmação;
+- formatos brasileiros: máscaras e dígitos verificadores de CPF/CNPJ, telefone e CEP;
+- clientes: lista formatada e busca por documento, cadastro com endereço, validações, aviso e erro de documento
+  repetido, edição de contato só com o que mudou, renomear, cliente arquivado só para consulta e arquivamento.
 
 Os testes de tela simulam a API com `mockApi` ([`src/test/api.ts`](src/test/api.ts)), que responde por
 `MÉTODO /api/caminho` e guarda as chamadas feitas para o teste conferir o corpo enviado.
@@ -354,14 +393,15 @@ request e também verifica se a imagem Docker é construída.
 
 ## Como adicionar um módulo
 
-O catálogo de serviços é o modelo. Para a tela de clientes, por exemplo:
+O catálogo de serviços e os clientes são o modelo. Para a tela de veículos, por exemplo:
 
-1. Crie `src/api/customers.ts` com os tipos, as chamadas (usando o cliente `http`) e os hooks do TanStack Query,
+1. Crie `src/api/vehicles.ts` com os tipos, as chamadas (usando o cliente `http`) e os hooks do TanStack Query,
    como em [`src/api/catalogServices.ts`](src/api/catalogServices.ts). Mutações invalidam a lista para ela recarregar.
-2. Crie a página em `src/features/customers/CustomersPage.tsx` usando `DataTable`, `PageHeader`, `ConfirmModal` e
+2. Crie a página em `src/features/vehicles/VehiclesPage.tsx` usando `DataTable`, `PageHeader`, `ConfirmModal` e
    os helpers `notifySuccess`/`notifyError`.
 3. Em `src/routes/modules.ts`, aponte o campo `page` do módulo para a nova página. A rota, o menu e o painel passam a
-   usá-la (sem `page`, a rota mostra "Em breve").
+   usá-la (sem `page`, a rota mostra "Em breve"). Se o módulo tiver subpáginas (cadastro, detalhe), o `page` é um
+   componente com `<Routes>` próprio, como [`CustomersModule`](src/features/customers/CustomersModule.tsx).
 4. Se as permissões mudarem no backend, atualize `src/routes/modules.ts` e a tabela deste README.
 
 ## Roteiro de entrega
@@ -371,7 +411,7 @@ O frontend é entregue em fases, na ordem do mapa de API para telas:
 | Fase | Conteúdo                                                                      | Situação     |
 | :--: | ----------------------------------------------------------------------------- | ------------ |
 |  1   | Fundação: projeto, Docker, login JWT, rotas por papel, layout                 | ✅ Pronta    |
-|  2   | Cadastros: clientes, veículos, catálogo de serviços, técnicos e usuários      | 🚧 Catálogo pronto; clientes, veículos, técnicos e usuários a seguir |
+|  2   | Cadastros: clientes, veículos, catálogo de serviços, técnicos e usuários      | 🚧 Catálogo e clientes prontos; veículos, técnicos e usuários a seguir |
 |  3   | Ordens de serviço (parte 1): abertura, listagem, diagnóstico, prioridade, acompanhamento | Planejada |
 |  4   | Orçamentos: geração, consulta e decisão                                       | Planejada    |
 |  5   | Execução e entrega: técnico, início, progresso, conclusão, finalização        | Planejada    |
