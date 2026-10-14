@@ -13,7 +13,7 @@ import { MODULES } from './modules';
 const moduleRoutes: RouteObject[] = MODULES.filter((module) => module.path !== '/').map((module) => {
   const Page = module.page;
   return {
-    path: module.path.slice(1),
+    path: `${module.path.slice(1)}/*`,
     element: <RequireAuth roles={module.roles}>{Page ? <Page /> : <ComingSoonPage module={module} />}</RequireAuth>,
   };
 });

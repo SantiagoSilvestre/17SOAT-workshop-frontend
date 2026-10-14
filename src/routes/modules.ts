@@ -15,6 +15,7 @@ import {
 } from '@tabler/icons-react';
 import { STAFF_ROLES, type Role } from '@/auth/roles';
 import { CatalogPage } from '@/features/catalog/CatalogPage';
+import { CustomersModule } from '@/features/customers/CustomersModule';
 
 export interface AppModule {
   path: string;
@@ -25,7 +26,10 @@ export interface AppModule {
   roles?: readonly Role[];
   /** Fase da entrega incremental em que o módulo ganha telas de verdade. */
   phase: number;
-  /** Tela do módulo. Sem valor, a rota mostra a página "Em breve". */
+  /**
+   * Tela do módulo. Sem valor, a rota mostra a página "Em breve". A rota aceita subcaminhos
+   * (ex.: /clientes/novo), que o módulo resolve com seu próprio <Routes>.
+   */
   page?: ComponentType;
 }
 
@@ -50,6 +54,7 @@ export const MODULES: readonly AppModule[] = [
     icon: IconUsers,
     roles: STAFF,
     phase: 2,
+    page: CustomersModule,
   },
   {
     path: '/veiculos',
