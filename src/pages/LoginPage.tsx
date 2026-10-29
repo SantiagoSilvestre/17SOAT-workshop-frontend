@@ -7,6 +7,8 @@ import { Navigate, useLocation, useNavigate, type Location } from 'react-router-
 import { z } from 'zod';
 import { ApiError, errorMessage } from '@/api/http';
 import { useAuth } from '@/auth/AuthContext';
+import type { Role } from '@/auth/roles';
+import { canAccessPath } from '@/routes/modules';
 
 const loginSchema = z.object({
   username: z.string().trim().min(1, 'Informe o usuário'),
@@ -27,7 +29,9 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   const from = (location.state as { from?: Location } | null)?.from;
-  const redirectTo = from ? `${from.pathname}${from.search}` : '/';
+  // Volta para a página pedida só se o novo usuário puder abri-la: quem entra depois de
+  // outra pessoa sair (ou da sessão dela expirar) pode ter outro papel.
+  const redirectFor = (role: Role) => (from && canAccessPath(role, from.pathname) ? `${from.pathname}${from.search}` : '/');
 
   const {
     register,
@@ -35,13 +39,13 @@ export function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm<LoginForm>({ resolver: zodResolver(loginSchema), defaultValues: { username: '', password: '' } });
 
-  if (session) return <Navigate to={redirectTo} replace />;
+  if (session) return <Navigate to={redirectFor(session.role)} replace />;
 
   const onSubmit = handleSubmit(async ({ username, password }) => {
     setError(null);
     try {
-      await login(username, password);
-      navigate(redirectTo, { replace: true });
+      const started = await login(username, password);
+      navigate(redirectFor(started.role), { replace: true });
     } catch (caught) {
       setError(loginErrorMessage(caught));
     }
