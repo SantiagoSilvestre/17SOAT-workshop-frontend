@@ -1,7 +1,8 @@
 # Oficina 17SOAT · Frontend
 
 Interface web do **sistema de gestão de oficina mecânica** desenvolvido no curso 17SOAT. Ela consome a API do
-repositório [17SOAT-workshop-management-system](https://github.com/SystemIvan/17SOAT-workshop-management-system)
+repositório [17SOAT-workshop-management-system](https://github.com/SantiagoSilvestre/17SOAT-workshop-management-system),
+branch [`feat/platform-kubernetes-infrastructure-delivery`](https://github.com/SantiagoSilvestre/17SOAT-workshop-management-system/tree/feat/platform-kubernetes-infrastructure-delivery)
 (Spring Boot + MySQL) e cobre, de forma incremental, todas as funcionalidades da API: cadastros, ordens de serviço,
 orçamentos, execução, estoque, compras e relatórios.
 
@@ -106,23 +107,23 @@ simulador de fornecedor e o frontend.
 1. Clone os dois repositórios **lado a lado**:
 
    ```bash
-   git clone https://github.com/SystemIvan/17SOAT-workshop-management-system.git
+   git clone https://github.com/SantiagoSilvestre/17SOAT-workshop-management-system.git
    git clone https://github.com/SantiagoSilvestre/17SOAT-workshop-frontend.git
    ```
 
    ```
    pasta-de-trabalho/
-   ├── 17SOAT-workshop-management-system/   ← backend (use a branch dev, a mais atualizada)
+   ├── 17SOAT-workshop-management-system/   ← backend (branch feat/platform-kubernetes-infrastructure-delivery)
    └── 17SOAT-workshop-frontend/            ← este repositório
    ```
 
    > Se o backend estiver em outro lugar, informe o caminho em `BACKEND_PATH` no arquivo `.env`
    > (veja [Variáveis de ambiente](#variáveis-de-ambiente)).
 
-2. Na pasta do backend, use a branch de integração:
+2. Na pasta do backend, use a branch que o frontend acompanha (a mais atual):
 
    ```bash
-   cd 17SOAT-workshop-management-system && git checkout dev && cd ..
+   cd 17SOAT-workshop-management-system && git checkout feat/platform-kubernetes-infrastructure-delivery && cd ..
    ```
 
 3. Suba tudo a partir da pasta do frontend:
@@ -429,7 +430,9 @@ O backend não está em `../17SOAT-workshop-management-system`. Clone-o ao lado 
 `BACKEND_PATH` no `.env`.
 
 **O login responde "Não foi possível conectar ao servidor" ou erro 502**
-A API ainda está subindo (o Spring Boot leva alguns segundos depois do MySQL ficar saudável). Acompanhe com
+A API ainda está subindo. Na opção 1 o frontend só sobe depois que o healthcheck da API
+(`/actuator/health/readiness`) responde, o que pode levar até 3 minutos na primeira vez; nas outras opções a API
+pode ainda não estar pronta. Acompanhe com
 `docker compose logs -f app` e tente de novo. Na opção 2, confira se a API responde em http://localhost:8080.
 
 **"Usuário ou senha inválidos" com os usuários de teste**
