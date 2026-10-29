@@ -24,6 +24,12 @@ class ResizeObserverStub {
 }
 window.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
 
+// O Textarea com autosize escuta o carregamento de fontes (document.fonts), que o jsdom também não tem.
+Object.defineProperty(document, 'fonts', {
+  configurable: true,
+  value: { addEventListener: vi.fn(), removeEventListener: vi.fn() },
+});
+
 afterEach(() => {
   cleanup();
   localStorage.clear();

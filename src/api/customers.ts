@@ -60,8 +60,9 @@ export const customerKeys = {
   detail: (id: string) => ['customers', id] as const,
 };
 
-export function useCustomers() {
-  return useQuery({ queryKey: customerKeys.all, queryFn: ({ signal }) => customersApi.list(signal) });
+/** `enabled` evita a chamada para papéis que a API recusaria (ex.: técnico no painel de OS). */
+export function useCustomers(enabled = true) {
+  return useQuery({ queryKey: customerKeys.all, queryFn: ({ signal }) => customersApi.list(signal), enabled });
 }
 
 export function useCustomer(id: string | undefined) {
