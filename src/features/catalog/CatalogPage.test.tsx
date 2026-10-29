@@ -136,6 +136,25 @@ describe('catálogo de serviços', () => {
     ]);
   });
 
+  it('apagar o preço na edição não volta ao valor anterior', async () => {
+    sessionStore.start(fakeToken('MANAGER'), 'manager.dev');
+    const { calls } = mockApi({ 'GET /api/catalog-services': { body: [oilChange] } });
+    renderApp('/catalogo');
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Editar Troca de óleo' }));
+    const dialog = await screen.findByRole('dialog');
+    const price = within(dialog).getByLabelText('Preço base');
+    await user.clear(price);
+    await user.type(price, '9');
+    await user.clear(price);
+    await user.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+
+    expect(await within(dialog).findByText('Informe o preço base')).toBeInTheDocument();
+    expect(price).toHaveValue('');
+    expect(calls.filter((call) => call.method !== 'GET')).toHaveLength(0);
+  });
+
   it('arquiva depois de confirmar', async () => {
     sessionStore.start(fakeToken('ADMIN'), 'admin');
     const { calls } = mockApi({

@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useArchiveCustomer, useCustomer, type Address } from '@/api/customers';
 import { ApiError, errorMessage } from '@/api/http';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { CustomerVehicles } from '@/features/vehicles/CustomerVehicles';
 import { formatDocument, formatPhone, formatPostalCode } from '@/lib/br';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { EditContactModal } from './EditContactModal';
@@ -145,6 +146,8 @@ export function CustomerDetailPage() {
           )}
         </Section>
       </SimpleGrid>
+
+      <CustomerVehicles customerId={customer.id} canAdd={editable} />
 
       <RenameCustomerModal customer={customer} opened={modal === 'rename'} onClose={() => setModal(null)} />
       <EditContactModal customer={customer} opened={modal === 'contact'} onClose={() => setModal(null)} />
