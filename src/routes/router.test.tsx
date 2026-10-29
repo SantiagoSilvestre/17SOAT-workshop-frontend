@@ -51,6 +51,24 @@ describe('rotas protegidas', () => {
     expect(await screen.findByRole('heading', { name: 'Clientes' })).toBeInTheDocument();
   });
 
+  it('não volta para uma página que o novo usuário não pode abrir', async () => {
+    const token = fakeToken('TECHNICIAN');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ token, role: 'TECHNICIAN', expiresAt: new Date().toISOString() }), { status: 200 }),
+      ),
+    );
+    const { router } = renderApp('/usuarios');
+    const user = userEvent.setup();
+
+    await user.type(await screen.findByLabelText('Usuário'), 'technician.dev');
+    await user.type(screen.getByLabelText('Senha'), 'changeme123');
+    await user.click(screen.getByRole('button', { name: 'Entrar' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+  });
+
   it('mostra erro com credenciais inválidas', async () => {
     vi.stubGlobal(
       'fetch',

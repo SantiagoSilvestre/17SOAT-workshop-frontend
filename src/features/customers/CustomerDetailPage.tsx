@@ -1,9 +1,10 @@
 import { Alert, Anchor, Badge, Button, Center, Group, Loader, Paper, SimpleGrid, Stack, Text, Title } from '@mantine/core';
-import { IconAlertCircle, IconArchive, IconArrowLeft, IconMail, IconPencil, IconPhone } from '@tabler/icons-react';
+import { IconAlertCircle, IconArchive, IconArrowLeft, IconKey, IconMail, IconPencil, IconPhone } from '@tabler/icons-react';
 import { useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useArchiveCustomer, useCustomer, type Address } from '@/api/customers';
 import { ApiError, errorMessage } from '@/api/http';
+import { useSession } from '@/auth/AuthContext';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { CustomerVehicles } from '@/features/vehicles/CustomerVehicles';
 import { formatDocument, formatPhone, formatPostalCode } from '@/lib/br';
@@ -34,6 +35,7 @@ type ModalState = 'rename' | 'contact' | 'archive' | null;
 export function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const session = useSession();
   const { data: customer, isLoading, error } = useCustomer(id);
   const archive = useArchiveCustomer();
   const [modal, setModal] = useState<ModalState>(null);
@@ -95,6 +97,16 @@ export function CustomerDetailPage() {
         </Stack>
         {editable && (
           <Group gap="xs">
+            {session.role === 'ADMIN' && (
+              <Button
+                variant="default"
+                leftSection={<IconKey size={16} />}
+                component={Link}
+                to={`/usuarios?papel=CUSTOMER&vinculo=${customer.id}`}
+              >
+                Criar acesso
+              </Button>
+            )}
             <Button variant="default" leftSection={<IconPencil size={16} />} onClick={() => setModal('rename')}>
               Renomear
             </Button>

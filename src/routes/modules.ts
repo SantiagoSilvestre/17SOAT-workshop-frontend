@@ -13,9 +13,11 @@ import {
   IconUsers,
   IconUsersGroup,
 } from '@tabler/icons-react';
-import { STAFF_ROLES, type Role } from '@/auth/roles';
+import { hasAnyRole, STAFF_ROLES, type Role } from '@/auth/roles';
 import { CatalogPage } from '@/features/catalog/CatalogPage';
 import { CustomersModule } from '@/features/customers/CustomersModule';
+import { TechniciansPage } from '@/features/technicians/TechniciansPage';
+import { UsersPage } from '@/features/users/UsersPage';
 import { VehiclesModule } from '@/features/vehicles/VehiclesModule';
 
 export interface AppModule {
@@ -82,6 +84,7 @@ export const MODULES: readonly AppModule[] = [
     icon: IconUsersGroup,
     roles: STAFF,
     phase: 2,
+    page: TechniciansPage,
   },
   {
     path: '/usuarios',
@@ -90,6 +93,7 @@ export const MODULES: readonly AppModule[] = [
     icon: IconUserCog,
     roles: ['ADMIN'],
     phase: 2,
+    page: UsersPage,
   },
   {
     path: '/ordens-de-servico',
@@ -140,3 +144,9 @@ export const MODULES: readonly AppModule[] = [
     phase: 7,
   },
 ];
+
+/** Diz se o papel pode abrir o caminho, pelo módulo a que ele pertence. Caminhos fora dos módulos ficam liberados. */
+export function canAccessPath(role: Role, pathname: string): boolean {
+  const module = MODULES.find((item) => item.path !== '/' && (pathname === item.path || pathname.startsWith(`${item.path}/`)));
+  return !module || hasAnyRole(role, module.roles);
+}

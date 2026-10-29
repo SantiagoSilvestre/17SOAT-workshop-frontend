@@ -27,6 +27,8 @@ orçamentos, execução, estoque, compras e relatórios.
 - [Catálogo de serviços](#catálogo-de-serviços)
 - [Clientes](#clientes)
 - [Veículos](#veículos)
+- [Técnicos](#técnicos)
+- [Usuários](#usuários)
 - [Estrutura do projeto](#estrutura-do-projeto)
 - [Scripts](#scripts)
 - [Testes e CI](#testes-e-ci)
@@ -38,7 +40,7 @@ orçamentos, execução, estoque, compras e relatórios.
 
 ## Situação atual
 
-A **fase 1** (fundação) está pronta e a **fase 2** (cadastros) já tem catálogo de serviços, clientes e veículos. Já funciona:
+As **fases 1** (fundação) e **2** (cadastros) estão prontas. Já funciona:
 
 - Login com usuário e senha usando o JWT emitido pelo backend (`POST /api/auth/login`).
 - Sessão persistida no navegador e encerrada automaticamente quando o token expira (1 hora, sem refresh no backend)
@@ -56,6 +58,10 @@ A **fase 1** (fundação) está pronta e a **fase 2** (cadastros) já tem catál
   ver o detalhe, renomear, editar contato e endereço e arquivar (veja [Clientes](#clientes)).
 - **Veículos**: listar com o nome do dono, buscar pela placa com ou sem hífen, cadastrar (também a partir do
   cliente), editar, registrar quilometragem e arquivar (veja [Veículos](#veículos)).
+- **Técnicos**: listar com especialidades e situação, cadastrar, renomear, marcar como disponível ou ocupado e
+  desativar (veja [Técnicos](#técnicos)).
+- **Usuários** (só administrador): criar contas de acesso, inclusive de técnico e de cliente vinculadas ao
+  cadastro (veja [Usuários](#usuários)).
 
 Os demais módulos já aparecem no menu, com a etiqueta **Em breve** no painel, e ganham telas nas próximas fases
 (veja o [roteiro](#roteiro-de-entrega)).
@@ -236,7 +242,8 @@ continuam valendo e podem ir no mesmo `.env`. Veja o `.env.example` do backend.
 4. Toda chamada leva `Authorization: Bearer <token>`. Se a API responder `401`, a sessão é encerrada e o usuário
    volta para o login. Um temporizador também encerra a sessão no horário de expiração do token, e 5 minutos antes
    aparece um aviso para o usuário salvar o que estiver fazendo.
-5. Depois do login o usuário volta para a página que tentou abrir.
+5. Depois do login o usuário volta para a página que tentou abrir, se o papel dele permitir; senão vai para o
+   painel. Isso evita cair em **Acesso negado** quando outra pessoa entra depois de uma saída ou expiração.
 
 Permissões por módulo (baseadas no `SecurityConfig` do backend):
 
@@ -348,6 +355,59 @@ Telas em `/veiculos` (lista), `/veiculos/novo` (cadastro) e `/veiculos/{id}` (de
   Veículos arquivados não aparecem ali; continuam acessíveis pelo link direto.
 - **Arquivar** tira o veículo da lista, impede novas ordens de serviço para ele e não tem volta pela API.
 
+## Técnicos
+
+Tela em `/tecnicos`, para ADMIN e MANAGER.
+
+![Lista de técnicos](docs/screenshots/tecnicos.png)
+
+| Ação                         | Endpoint                             |
+| ---------------------------- | ------------------------------------ |
+| Listar (todos, inclusive inativos) | `GET /api/technicians`         |
+| Cadastrar                    | `POST /api/technicians`              |
+| Renomear                     | `PATCH /api/technicians/{id}`        |
+| Mudar a situação             | `PATCH /api/technicians/{id}/status` |
+
+- **Especialidades**: Mecânica, Elétrica, Funilaria, Pintura e Diagnóstico. O cadastro exige ao menos uma. A API
+  não permite mudar as especialidades depois, então a edição só renomeia.
+- **Situação**: um técnico novo começa **Disponível**. Pelo menu de ações ele passa para **Ocupado** e volta.
+  **Desativar** pede confirmação, porque a API não deixa um técnico inativo voltar à ativa.
+- A lista esconde os inativos; a opção **Mostrar inativos** traz todos.
+- O administrador vê o atalho **Criar acesso** (ícone de chave), que abre a tela de usuários com o técnico já
+  escolhido.
+
+## Usuários
+
+Tela em `/usuarios`, só para ADMIN. Usa `POST /api/auth/users`.
+
+![Criação de conta](docs/screenshots/usuarios.png)
+
+A API **só cria** contas: não há rota para listar, editar, trocar a senha ou remover. Por isso a tela é um
+formulário de criação, e a confirmação mostra o usuário, o papel e o cadastro vinculado.
+
+| Papel          | Vínculo                     | O que a conta enxerga                                 |
+| -------------- | --------------------------- | ----------------------------------------------------- |
+| Administrador  | nenhum                      | tudo, inclusive criar contas                          |
+| Gerente        | nenhum                      | cadastros, ordens, orçamentos, estoque e compras      |
+| Técnico        | obrigatório: um técnico     | as ordens de serviço                                  |
+| Cliente        | obrigatório: um cliente     | acompanhamento de ordem e orçamentos                  |
+
+### Como criar a conta de um técnico ou de um cliente
+
+O vínculo (`linkedDomainId`) liga a conta a um cadastro real e vai no token como claim. O backend não confere se o
+id existe, por isso a tela só oferece técnicos e clientes cadastrados. Hoje a API ainda não usa essa claim para
+filtrar dados; as telas de acompanhamento do cliente e de execução do técnico (fases 3 a 5) vão usá-la.
+
+1. Entre como `admin`.
+2. Cadastre o técnico em **Técnicos** (ou o cliente em **Clientes**), se ainda não existir.
+3. Clique em **Criar acesso**: o ícone de chave na linha do técnico, ou o botão no detalhe do cliente. A tela de
+   usuários abre com o papel e o cadastro já escolhidos. Também dá para ir direto em **Usuários** e escolher o papel
+   e o cadastro na lista.
+4. Defina usuário e senha e clique em **Criar conta**. Usuário repetido aparece no próprio campo.
+5. A pessoa já pode entrar com essa conta.
+
+Só técnicos ativos e clientes ativos aparecem para vínculo.
+
 ## Estrutura do projeto
 
 ```
@@ -363,7 +423,9 @@ Telas em `/veiculos` (lista), `/veiculos/novo` (cadastro) e `/veiculos/{id}` (de
 │   │   ├── auth.ts               # chamadas de autenticação
 │   │   ├── catalogServices.ts    # catálogo: chamadas, tipos e hooks do TanStack Query
 │   │   ├── customers.ts          # clientes: chamadas, tipos e hooks
-│   │   └── vehicles.ts           # veículos: chamadas, tipos e hooks
+│   │   ├── vehicles.ts           # veículos: chamadas, tipos e hooks
+│   │   ├── technicians.ts        # técnicos: chamadas, tipos, rótulos e hooks
+│   │   └── users.ts              # criação de contas de acesso
 │   ├── auth/
 │   │   ├── roles.ts              # papéis e rótulos em português
 │   │   ├── token.ts              # leitura das claims do JWT
@@ -380,7 +442,9 @@ Telas em `/veiculos` (lista), `/veiculos/novo` (cadastro) e `/veiculos/{id}` (de
 │   ├── features/
 │   │   ├── catalog/              # tela e formulário do catálogo de serviços
 │   │   ├── customers/            # lista, cadastro, detalhe e modais de clientes
-│   │   └── vehicles/             # lista, cadastro, detalhe e modais de veículos
+│   │   ├── vehicles/             # lista, cadastro, detalhe e modais de veículos
+│   │   ├── technicians/          # lista e modal de técnicos
+│   │   └── users/                # criação de contas
 │   ├── lib/                      # dinheiro, formatos brasileiros (CPF/CNPJ, telefone, CEP, placa), texto e notificações
 │   ├── layout/AppLayout.tsx      # cabeçalho, menu lateral e área de conteúdo
 │   ├── pages/                    # Login, Painel, Acesso negado, 404, "Em breve"
@@ -426,7 +490,12 @@ Os testes usam Vitest + Testing Library com jsdom e cobrem:
   repetido, edição de contato só com o que mudou, renomear, cliente arquivado só para consulta e arquivamento;
 - veículos: placa (antiga e Mercosul), chassi, ano e quilometragem; lista com nome do cliente e busca pela placa,
   cadastro a partir do cliente com dados normalizados, validações e placa repetida, quilometragem que não diminui,
-  edição que mantém o chassi e veículos no detalhe do cliente.
+  edição que mantém o chassi e veículos no detalhe do cliente;
+- técnicos: rótulos em português, inativos escondidos por padrão, cadastro com especialidade obrigatória, renomear
+  e mudança de situação com confirmação para desativar;
+- usuários: conta sem vínculo, conta de técnico vinda do atalho, senhas diferentes, cliente obrigatório, usuário
+  repetido e bloqueio para quem não é administrador;
+- login de outro papel que não volta para uma página proibida.
 
 Os testes de tela simulam a API com `mockApi` ([`src/test/api.ts`](src/test/api.ts)), que responde por
 `MÉTODO /api/caminho` e guarda as chamadas feitas para o teste conferir o corpo enviado.
@@ -436,12 +505,12 @@ request e também verifica se a imagem Docker é construída.
 
 ## Como adicionar um módulo
 
-O catálogo de serviços, os clientes e os veículos são o modelo. Para a tela de técnicos, por exemplo:
+Os cadastros da fase 2 são o modelo. Para a tela de estoque, por exemplo:
 
-1. Crie `src/api/technicians.ts` com os tipos, as chamadas (usando o cliente `http`) e os hooks do TanStack Query,
+1. Crie `src/api/stockItems.ts` com os tipos, as chamadas (usando o cliente `http`) e os hooks do TanStack Query,
    como em [`src/api/vehicles.ts`](src/api/vehicles.ts). Mutações invalidam a lista para ela recarregar.
-2. Crie a página em `src/features/technicians/TechniciansPage.tsx` usando `DataTable`, `PageHeader`, `ConfirmModal`
-   e os helpers `notifySuccess`/`notifyError`.
+2. Crie a página em `src/features/stock/StockPage.tsx` usando `DataTable`, `PageHeader`, `ConfirmModal` e os
+   helpers `notifySuccess`/`notifyError`, como em [`TechniciansPage`](src/features/technicians/TechniciansPage.tsx).
 3. Em `src/routes/modules.ts`, aponte o campo `page` do módulo para a nova página. A rota, o menu e o painel passam a
    usá-la (sem `page`, a rota mostra "Em breve"). Se o módulo tiver subpáginas (cadastro, detalhe), o `page` é um
    componente com `<Routes>` próprio, como [`CustomersModule`](src/features/customers/CustomersModule.tsx).
@@ -454,7 +523,7 @@ O frontend é entregue em fases, na ordem do mapa de API para telas:
 | Fase | Conteúdo                                                                      | Situação     |
 | :--: | ----------------------------------------------------------------------------- | ------------ |
 |  1   | Fundação: projeto, Docker, login JWT, rotas por papel, layout                 | ✅ Pronta    |
-|  2   | Cadastros: clientes, veículos, catálogo de serviços, técnicos e usuários      | 🚧 Catálogo, clientes e veículos prontos; técnicos e usuários a seguir |
+|  2   | Cadastros: clientes, veículos, catálogo de serviços, técnicos e usuários      | ✅ Pronta    |
 |  3   | Ordens de serviço (parte 1): abertura, listagem, diagnóstico, prioridade, acompanhamento | Planejada |
 |  4   | Orçamentos: geração, consulta e decisão                                       | Planejada    |
 |  5   | Execução e entrega: técnico, início, progresso, conclusão, finalização        | Planejada    |
