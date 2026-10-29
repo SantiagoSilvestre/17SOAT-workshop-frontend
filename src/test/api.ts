@@ -10,6 +10,8 @@ type Handler = MockResponse | ((request: { body: unknown; url: URL }) => MockRes
 export interface RecordedCall {
   method: string;
   path: string;
+  /** Parâmetros da URL sem o "?" (ex.: "status=COMPLETED"). */
+  query?: string;
   body: unknown;
 }
 
@@ -23,7 +25,7 @@ export function mockApi(handlers: Record<string, Handler>) {
     const url = new URL(String(input), window.location.origin);
     const method = init?.method ?? 'GET';
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
-    calls.push({ method, path: url.pathname, body });
+    calls.push({ method, path: url.pathname, ...(url.search && { query: url.search.slice(1) }), body });
     const handler = handlers[`${method} ${url.pathname}`];
     if (!handler) {
       return new Response(JSON.stringify({ code: 'NOT_MOCKED', message: `${method} ${url.pathname}` }), { status: 500 });

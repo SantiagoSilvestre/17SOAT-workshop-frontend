@@ -20,10 +20,6 @@ export default defineConfig(({ mode }) => {
         '/api': { target: backendUrl, changeOrigin: true },
       },
     },
-    build: {
-      // Mantine + React Router + TanStack Query passam um pouco de 500 kB; dividir por rota fica para as próximas fases.
-      chunkSizeWarningLimit: 900,
-    },
     test: {
       globals: true,
       environment: 'jsdom',

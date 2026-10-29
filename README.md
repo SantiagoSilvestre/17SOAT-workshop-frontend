@@ -29,6 +29,7 @@ orçamentos, execução, estoque, compras e relatórios.
 - [Veículos](#veículos)
 - [Técnicos](#técnicos)
 - [Usuários](#usuários)
+- [Ordens de serviço](#ordens-de-serviço)
 - [Estrutura do projeto](#estrutura-do-projeto)
 - [Scripts](#scripts)
 - [Testes e CI](#testes-e-ci)
@@ -40,7 +41,7 @@ orçamentos, execução, estoque, compras e relatórios.
 
 ## Situação atual
 
-As **fases 1** (fundação) e **2** (cadastros) estão prontas. Já funciona:
+As **fases 1** (fundação) e **2** (cadastros) estão prontas, e a **fase 3** (ordens de serviço) começou. Já funciona:
 
 - Login com usuário e senha usando o JWT emitido pelo backend (`POST /api/auth/login`).
 - Sessão persistida no navegador e encerrada automaticamente quando o token expira (1 hora, sem refresh no backend)
@@ -62,6 +63,8 @@ As **fases 1** (fundação) e **2** (cadastros) estão prontas. Já funciona:
   desativar (veja [Técnicos](#técnicos)).
 - **Usuários** (só administrador): criar contas de acesso, inclusive de técnico e de cliente vinculadas ao
   cadastro (veja [Usuários](#usuários)).
+- **Ordens de serviço**: painel com filtros e **Nova OS**, que identifica ou cadastra cliente e veículo na mesma
+  hora e, com serviços, já gera o orçamento (veja [Ordens de serviço](#ordens-de-serviço)).
 
 Os demais módulos já aparecem no menu, com a etiqueta **Em breve** no painel, e ganham telas nas próximas fases
 (veja o [roteiro](#roteiro-de-entrega)).
@@ -408,6 +411,57 @@ filtrar dados; as telas de acompanhamento do cliente e de execução do técnico
 
 Só técnicos ativos e clientes ativos aparecem para vínculo.
 
+## Ordens de serviço
+
+Telas em `/ordens-de-servico` (painel, para ADMIN, MANAGER e TECHNICIAN) e `/ordens-de-servico/nova` (abertura,
+para ADMIN e MANAGER).
+
+![Painel de ordens de serviço](docs/screenshots/ordens.png)
+
+| Ação                         | Endpoint                                  |
+| ---------------------------- | ----------------------------------------- |
+| Listar com filtros           | `GET /api/service-orders?status=&priority=&customerId=&technicianId=` |
+| Abrir OS completa            | `POST /api/service-orders/intake`         |
+| Apoio à abertura             | `GET /api/customers/identify`, `GET /api/vehicles`, `GET /api/catalog-services`, `GET /api/stock-items`, `GET /api/technicians` |
+
+### Painel
+
+- Mostra as situações em português: Recebida, Em diagnóstico, Aguardando aprovação, Aguardando peças, Em execução,
+  Finalizada e Entregue. A prioridade (Baixa, Normal, Alta, Urgente) também vira selo.
+- **A ordem é a da API**: primeiro as em execução, depois aguardando aprovação, em diagnóstico, recebidas e
+  aguardando peças; dentro de cada situação, a mais antiga primeiro. Sem filtro de situação, a API omite as
+  finalizadas e entregues; para vê-las, escolha a situação no filtro.
+- Os filtros (situação, prioridade, cliente e técnico) vão para a API. O filtro de técnico pega tanto quem fez o
+  diagnóstico quanto quem executa algum serviço.
+- A API devolve só ids e a foto do veículo. O painel cruza com as listas de clientes e técnicos para mostrar os
+  nomes, e soma serviços e peças do diagnóstico para mostrar o total.
+- O **técnico** vê o painel sem a coluna de cliente nem os filtros de cliente e técnico, porque a API não deixa esse
+  papel listar clientes e técnicos. Ele também não vê o botão **Nova OS**.
+- A OS aparece com um número curto (`#A1B2C3D4`, os 8 primeiros caracteres do id), porque a API não tem número
+  sequencial. A API também não devolve a data de abertura.
+
+### Nova OS
+
+![OS aberta](docs/screenshots/os-aberta.png)
+
+A tela usa o intake do backend, que faz tudo numa transação só: se algo for recusado, nada é gravado.
+
+1. **Cliente**: ao sair do campo de CPF/CNPJ, a tela consulta `identify`. Com cadastro, mostra o nome e segue. Sem
+   cadastro, pede nome, e-mail e telefone para cadastrar (o endereço pode ser incluído depois, no detalhe do
+   cliente).
+2. **Veículo**: ao sair do campo de placa, a tela procura a placa na lista de veículos ativos. Com cadastro, mostra
+   o veículo; se ele for de outro cliente, avisa que a abertura será recusada. Sem cadastro, pede marca, modelo,
+   ano, cor e, opcionalmente, chassi e quilometragem.
+3. **Atendimento**: prioridade (Normal por padrão) e avaliação inicial, obrigatória.
+4. **Serviços** (opcional): serviços do catálogo e, em cada um, peças ou insumos do estoque com a quantidade. A
+   tela mostra uma prévia do orçamento com os preços atuais; o backend copia nome e preço no momento da abertura.
+   Com serviços, é obrigatório dizer qual técnico fez o diagnóstico.
+5. **Resultado**: o número da OS, se cliente e veículo foram reaproveitados ou cadastrados, e o número do orçamento
+   quando há serviços. A OS já fica **Aguardando aprovação**.
+
+Os conflitos (`409`) aparecem no campo certo: cliente arquivado, veículo arquivado, placa de outro cliente e chassi
+repetido.
+
 ## Estrutura do projeto
 
 ```
@@ -425,7 +479,9 @@ Só técnicos ativos e clientes ativos aparecem para vínculo.
 │   │   ├── customers.ts          # clientes: chamadas, tipos e hooks
 │   │   ├── vehicles.ts           # veículos: chamadas, tipos e hooks
 │   │   ├── technicians.ts        # técnicos: chamadas, tipos, rótulos e hooks
-│   │   └── users.ts              # criação de contas de acesso
+│   │   ├── users.ts              # criação de contas de acesso
+│   │   ├── serviceOrders.ts      # ordens de serviço: tipos, rótulos, listagem e intake
+│   │   └── stockItems.ts         # itens de estoque (por enquanto, só a lista usada na abertura de OS)
 │   ├── auth/
 │   │   ├── roles.ts              # papéis e rótulos em português
 │   │   ├── token.ts              # leitura das claims do JWT
@@ -444,12 +500,13 @@ Só técnicos ativos e clientes ativos aparecem para vínculo.
 │   │   ├── customers/            # lista, cadastro, detalhe e modais de clientes
 │   │   ├── vehicles/             # lista, cadastro, detalhe e modais de veículos
 │   │   ├── technicians/          # lista e modal de técnicos
-│   │   └── users/                # criação de contas
+│   │   ├── users/                # criação de contas
+│   │   └── serviceOrders/        # painel de OS e abertura (intake)
 │   ├── lib/                      # dinheiro, formatos brasileiros (CPF/CNPJ, telefone, CEP, placa), texto e notificações
 │   ├── layout/AppLayout.tsx      # cabeçalho, menu lateral e área de conteúdo
 │   ├── pages/                    # Login, Painel, Acesso negado, 404, "Em breve"
 │   ├── routes/
-│   │   ├── modules.ts            # mapa de módulos × papéis (fonte única)
+│   │   ├── modules.ts            # mapa de módulos × papéis (fonte única); telas carregadas sob demanda
 │   │   └── router.tsx            # definição das rotas
 │   ├── test/                     # utilitários de teste (JWT falso, fetch simulado, render com rotas)
 │   ├── theme.ts                  # tema do Mantine
@@ -495,7 +552,10 @@ Os testes usam Vitest + Testing Library com jsdom e cobrem:
   e mudança de situação com confirmação para desativar;
 - usuários: conta sem vínculo, conta de técnico vinda do atalho, senhas diferentes, cliente obrigatório, usuário
   repetido e bloqueio para quem não é administrador;
-- login de outro papel que não volta para uma página proibida.
+- login de outro papel que não volta para uma página proibida;
+- ordens de serviço: painel com rótulos, total e nomes, filtro enviado à API, painel do técnico sem dados de
+  cliente, abertura com cliente e veículo novos, abertura com serviço, peça e orçamento, técnico do diagnóstico
+  obrigatório, placa de outro cliente e bloqueio da Nova OS para técnico.
 
 Os testes de tela simulam a API com `mockApi` ([`src/test/api.ts`](src/test/api.ts)), que responde por
 `MÉTODO /api/caminho` e guarda as chamadas feitas para o teste conferir o corpo enviado.
@@ -514,6 +574,8 @@ Os cadastros da fase 2 são o modelo. Para a tela de estoque, por exemplo:
 3. Em `src/routes/modules.ts`, aponte o campo `page` do módulo para a nova página. A rota, o menu e o painel passam a
    usá-la (sem `page`, a rota mostra "Em breve"). Se o módulo tiver subpáginas (cadastro, detalhe), o `page` é um
    componente com `<Routes>` próprio, como [`CustomersModule`](src/features/customers/CustomersModule.tsx).
+   Declare a página com `lazy(...)`, como as outras: cada módulo vira um arquivo separado no build e só é baixado
+   quando a rota é aberta.
 4. Se as permissões mudarem no backend, atualize `src/routes/modules.ts` e a tabela deste README.
 
 ## Roteiro de entrega
@@ -524,7 +586,7 @@ O frontend é entregue em fases, na ordem do mapa de API para telas:
 | :--: | ----------------------------------------------------------------------------- | ------------ |
 |  1   | Fundação: projeto, Docker, login JWT, rotas por papel, layout                 | ✅ Pronta    |
 |  2   | Cadastros: clientes, veículos, catálogo de serviços, técnicos e usuários      | ✅ Pronta    |
-|  3   | Ordens de serviço (parte 1): abertura, listagem, diagnóstico, prioridade, acompanhamento | Planejada |
+|  3   | Ordens de serviço (parte 1): abertura, listagem, diagnóstico, prioridade, acompanhamento | 🚧 Painel e Nova OS prontos; detalhe, diagnóstico e acompanhamento a seguir |
 |  4   | Orçamentos: geração, consulta e decisão                                       | Planejada    |
 |  5   | Execução e entrega: técnico, início, progresso, conclusão, finalização        | Planejada    |
 |  6   | Estoque: itens, política de estoque baixo, reservas                           | Planejada    |

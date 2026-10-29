@@ -1,3 +1,5 @@
+import { Center, Loader } from '@mantine/core';
+import { Suspense } from 'react';
 import { createBrowserRouter, type RouteObject } from 'react-router-dom';
 import { RequireAuth } from '@/auth/RequireAuth';
 import { AppLayout } from '@/layout/AppLayout';
@@ -14,7 +16,23 @@ const moduleRoutes: RouteObject[] = MODULES.filter((module) => module.path !== '
   const Page = module.page;
   return {
     path: `${module.path.slice(1)}/*`,
-    element: <RequireAuth roles={module.roles}>{Page ? <Page /> : <ComingSoonPage module={module} />}</RequireAuth>,
+    element: (
+      <RequireAuth roles={module.roles}>
+        {Page ? (
+          <Suspense
+            fallback={
+              <Center py="xl">
+                <Loader aria-label="Carregando" />
+              </Center>
+            }
+          >
+            <Page />
+          </Suspense>
+        ) : (
+          <ComingSoonPage module={module} />
+        )}
+      </RequireAuth>
+    ),
   };
 });
 

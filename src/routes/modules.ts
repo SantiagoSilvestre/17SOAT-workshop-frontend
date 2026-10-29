@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react';
+import { lazy, type ComponentType, type LazyExoticComponent } from 'react';
 import {
   IconBuildingWarehouse,
   IconCar,
@@ -14,11 +14,26 @@ import {
   IconUsersGroup,
 } from '@tabler/icons-react';
 import { hasAnyRole, STAFF_ROLES, type Role } from '@/auth/roles';
-import { CatalogPage } from '@/features/catalog/CatalogPage';
-import { CustomersModule } from '@/features/customers/CustomersModule';
-import { TechniciansPage } from '@/features/technicians/TechniciansPage';
-import { UsersPage } from '@/features/users/UsersPage';
-import { VehiclesModule } from '@/features/vehicles/VehiclesModule';
+
+// Cada módulo vira um arquivo separado no build e só é baixado quando a rota é aberta.
+const CatalogPage = lazy(() =>
+  import('@/features/catalog/CatalogPage').then((m) => ({ default: m.CatalogPage })),
+);
+const CustomersModule = lazy(() =>
+  import('@/features/customers/CustomersModule').then((m) => ({ default: m.CustomersModule })),
+);
+const ServiceOrdersModule = lazy(() =>
+  import('@/features/serviceOrders/ServiceOrdersModule').then((m) => ({ default: m.ServiceOrdersModule })),
+);
+const TechniciansPage = lazy(() =>
+  import('@/features/technicians/TechniciansPage').then((m) => ({ default: m.TechniciansPage })),
+);
+const UsersPage = lazy(() =>
+  import('@/features/users/UsersPage').then((m) => ({ default: m.UsersPage })),
+);
+const VehiclesModule = lazy(() =>
+  import('@/features/vehicles/VehiclesModule').then((m) => ({ default: m.VehiclesModule })),
+);
 
 export interface AppModule {
   path: string;
@@ -33,7 +48,7 @@ export interface AppModule {
    * Tela do módulo. Sem valor, a rota mostra a página "Em breve". A rota aceita subcaminhos
    * (ex.: /clientes/novo), que o módulo resolve com seu próprio <Routes>.
    */
-  page?: ComponentType;
+  page?: ComponentType | LazyExoticComponent<ComponentType>;
 }
 
 const STAFF = STAFF_ROLES;
@@ -102,6 +117,7 @@ export const MODULES: readonly AppModule[] = [
     icon: IconClipboardList,
     roles: ['ADMIN', 'MANAGER', 'TECHNICIAN'],
     phase: 3,
+    page: ServiceOrdersModule,
   },
   {
     path: '/acompanhar',

@@ -43,8 +43,8 @@ export const technicianKeys = {
   all: ['technicians'] as const,
 };
 
-export function useTechnicians() {
-  return useQuery({ queryKey: technicianKeys.all, queryFn: ({ signal }) => techniciansApi.list(signal) });
+export function useTechnicians(enabled = true) {
+  return useQuery({ queryKey: technicianKeys.all, queryFn: ({ signal }) => techniciansApi.list(signal), enabled });
 }
 
 function useTechnicianMutation<TInput, TResult>(mutationFn: (input: TInput) => Promise<TResult>) {
