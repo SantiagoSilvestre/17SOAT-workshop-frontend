@@ -63,8 +63,9 @@ As **fases 1** (fundação) e **2** (cadastros) estão prontas, e a **fase 3** (
   desativar (veja [Técnicos](#técnicos)).
 - **Usuários** (só administrador): criar contas de acesso, inclusive de técnico e de cliente vinculadas ao
   cadastro (veja [Usuários](#usuários)).
-- **Ordens de serviço**: painel com filtros e **Nova OS**, que identifica ou cadastra cliente e veículo na mesma
-  hora e, com serviços, já gera o orçamento (veja [Ordens de serviço](#ordens-de-serviço)).
+- **Ordens de serviço**: painel com filtros; **Nova OS**, que identifica ou cadastra cliente e veículo na mesma
+  hora e, com serviços, já gera o orçamento; e **detalhe da OS**, com as etapas, a prioridade, o técnico do
+  diagnóstico e o registro do diagnóstico (veja [Ordens de serviço](#ordens-de-serviço)).
 
 Os demais módulos já aparecem no menu, com a etiqueta **Em breve** no painel, e ganham telas nas próximas fases
 (veja o [roteiro](#roteiro-de-entrega)).
@@ -413,8 +414,8 @@ Só técnicos ativos e clientes ativos aparecem para vínculo.
 
 ## Ordens de serviço
 
-Telas em `/ordens-de-servico` (painel, para ADMIN, MANAGER e TECHNICIAN) e `/ordens-de-servico/nova` (abertura,
-para ADMIN e MANAGER).
+Telas em `/ordens-de-servico` (painel), `/ordens-de-servico/:id` (detalhe), ambas para ADMIN, MANAGER e
+TECHNICIAN, e `/ordens-de-servico/nova` (abertura, para ADMIN e MANAGER).
 
 ![Painel de ordens de serviço](docs/screenshots/ordens.png)
 
@@ -423,6 +424,10 @@ para ADMIN e MANAGER).
 | Listar com filtros           | `GET /api/service-orders?status=&priority=&customerId=&technicianId=` |
 | Abrir OS completa            | `POST /api/service-orders/intake`         |
 | Apoio à abertura             | `GET /api/customers/identify`, `GET /api/vehicles`, `GET /api/catalog-services`, `GET /api/stock-items`, `GET /api/technicians` |
+| Detalhe                      | `GET /api/service-orders/{id}`            |
+| Alterar prioridade           | `PATCH /api/service-orders/{id}/priority` |
+| Definir técnico do diagnóstico | `PUT /api/service-orders/{id}/diagnosis-assignee` |
+| Registrar diagnóstico        | `POST /api/service-orders/{id}/diagnosis` |
 
 ### Painel
 
@@ -457,10 +462,48 @@ A tela usa o intake do backend, que faz tudo numa transação só: se algo for r
    tela mostra uma prévia do orçamento com os preços atuais; o backend copia nome e preço no momento da abertura.
    Com serviços, é obrigatório dizer qual técnico fez o diagnóstico.
 5. **Resultado**: o número da OS, se cliente e veículo foram reaproveitados ou cadastrados, e o número do orçamento
-   quando há serviços. A OS já fica **Aguardando aprovação**.
+   quando há serviços, com um atalho para o detalhe da OS. Com serviços, a OS já fica **Aguardando aprovação**.
 
 Os conflitos (`409`) aparecem no campo certo: cliente arquivado, veículo arquivado, placa de outro cliente e chassi
 repetido.
+
+### Detalhe e diagnóstico
+
+![Detalhe da OS](docs/screenshots/os-detalhe.png)
+
+O número da OS no painel abre o detalhe. A tela mostra:
+
+- **Etapas**: Recebida, Diagnóstico, Aprovação, Execução, Finalizada e Entregue, com a atual em destaque. A API não
+  guarda o histórico nem a data de cada mudança, então a linha mostra onde a OS está, não quando passou por cada
+  etapa.
+- **Atendimento**: prioridade, técnico do diagnóstico e avaliação inicial. Veículo e cliente (este só para ADMIN e
+  MANAGER) levam aos respectivos cadastros. O veículo aparece como estava na abertura.
+- **Serviços**: cada serviço com a situação, quem diagnosticou e quando, as peças e o valor, com o total da OS.
+- **O próximo passo**, quando não há ação disponível: definir o técnico, gerar o orçamento ou esperar a decisão do
+  cliente.
+
+A tela só oferece as ações que a API aceitaria na situação atual:
+
+| Ação                         | Quem                     | Quando                                                       |
+| ---------------------------- | ------------------------ | ------------------------------------------------------------ |
+| Alterar prioridade           | ADMIN, MANAGER, TECHNICIAN | Até a OS ser finalizada                                    |
+| Definir ou trocar o técnico do diagnóstico | ADMIN, MANAGER | Sem diagnóstico aberto e até a OS ser finalizada      |
+| Registrar diagnóstico        | ADMIN, MANAGER, TECHNICIAN | Com técnico definido, sem diagnóstico aberto e até a OS ser finalizada |
+
+O diagnóstico fica aberto enquanto algum serviço dele aguarda a decisão do orçamento. Nesse período a API não deixa
+trocar o técnico nem registrar outro diagnóstico.
+
+![Registrar diagnóstico](docs/screenshots/os-diagnostico-form.png)
+
+No **registro do diagnóstico**, cada serviço vem do catálogo e começa com o preço de tabela, que pode ser ajustado
+para o veículo. As peças entram numa etapa seguinte. A equipe administrativa escolhe quem diagnosticou (o técnico
+definido vem marcado). O técnico registra no próprio nome, usando o cadastro vinculado à conta dele (veja
+[Como criar a conta de um técnico](#como-criar-a-conta-de-um-técnico-ou-de-um-cliente)); sem vínculo, a tela avisa
+que ele não pode registrar. Como a API não deixa o técnico listar técnicos nem clientes, ele vê "Você" no lugar do
+próprio nome e a tela não mostra o cliente.
+
+Depois do registro, a OS fica **Em diagnóstico** e os serviços **Aguardando orçamento**. Gerar o orçamento é a fase
+4.
 
 ## Estrutura do projeto
 
@@ -480,7 +523,7 @@ repetido.
 │   │   ├── vehicles.ts           # veículos: chamadas, tipos e hooks
 │   │   ├── technicians.ts        # técnicos: chamadas, tipos, rótulos e hooks
 │   │   ├── users.ts              # criação de contas de acesso
-│   │   ├── serviceOrders.ts      # ordens de serviço: tipos, rótulos, listagem e intake
+│   │   ├── serviceOrders.ts      # ordens de serviço: tipos, rótulos, listagem, intake e ações da OS
 │   │   └── stockItems.ts         # itens de estoque (por enquanto, só a lista usada na abertura de OS)
 │   ├── auth/
 │   │   ├── roles.ts              # papéis e rótulos em português
@@ -501,7 +544,7 @@ repetido.
 │   │   ├── vehicles/             # lista, cadastro, detalhe e modais de veículos
 │   │   ├── technicians/          # lista e modal de técnicos
 │   │   ├── users/                # criação de contas
-│   │   └── serviceOrders/        # painel de OS e abertura (intake)
+│   │   └── serviceOrders/        # painel, abertura (intake), detalhe e diagnóstico
 │   ├── lib/                      # dinheiro, formatos brasileiros (CPF/CNPJ, telefone, CEP, placa), texto e notificações
 │   ├── layout/AppLayout.tsx      # cabeçalho, menu lateral e área de conteúdo
 │   ├── pages/                    # Login, Painel, Acesso negado, 404, "Em breve"
@@ -555,7 +598,9 @@ Os testes usam Vitest + Testing Library com jsdom e cobrem:
 - login de outro papel que não volta para uma página proibida;
 - ordens de serviço: painel com rótulos, total e nomes, filtro enviado à API, painel do técnico sem dados de
   cliente, abertura com cliente e veículo novos, abertura com serviço, peça e orçamento, técnico do diagnóstico
-  obrigatório, placa de outro cliente e bloqueio da Nova OS para técnico.
+  obrigatório, placa de outro cliente e bloqueio da Nova OS para técnico; detalhe com técnico definido e diagnóstico
+  com preço ajustado, troca de prioridade, diagnóstico do técnico no próprio nome sem consultar técnicos e clientes,
+  ações escondidas com orçamento pendente ou OS finalizada, e OS inexistente.
 
 Os testes de tela simulam a API com `mockApi` ([`src/test/api.ts`](src/test/api.ts)), que responde por
 `MÉTODO /api/caminho` e guarda as chamadas feitas para o teste conferir o corpo enviado.
@@ -586,7 +631,7 @@ O frontend é entregue em fases, na ordem do mapa de API para telas:
 | :--: | ----------------------------------------------------------------------------- | ------------ |
 |  1   | Fundação: projeto, Docker, login JWT, rotas por papel, layout                 | ✅ Pronta    |
 |  2   | Cadastros: clientes, veículos, catálogo de serviços, técnicos e usuários      | ✅ Pronta    |
-|  3   | Ordens de serviço (parte 1): abertura, listagem, diagnóstico, prioridade, acompanhamento | 🚧 Painel e Nova OS prontos; detalhe, diagnóstico e acompanhamento a seguir |
+|  3   | Ordens de serviço (parte 1): abertura, listagem, diagnóstico, prioridade, acompanhamento | ✅ Pronta    |
 |  4   | Orçamentos: geração, consulta e decisão                                       | Planejada    |
 |  5   | Execução e entrega: técnico, início, progresso, conclusão, finalização        | Planejada    |
 |  6   | Estoque: itens, política de estoque baixo, reservas                           | Planejada    |

@@ -30,6 +30,9 @@ Object.defineProperty(document, 'fonts', {
   value: { addEventListener: vi.fn(), removeEventListener: vi.fn() },
 });
 
+// O Combobox rola até a opção escolhida ao abrir a lista.
+Element.prototype.scrollIntoView = vi.fn();
+
 afterEach(() => {
   cleanup();
   localStorage.clear();

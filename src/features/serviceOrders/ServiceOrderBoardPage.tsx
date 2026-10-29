@@ -1,4 +1,4 @@
-import { Button, Group, Select, SimpleGrid, Stack, Text } from '@mantine/core';
+import { Anchor, Button, Group, Select, SimpleGrid, Stack, Text } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -50,9 +50,9 @@ export function ServiceOrderBoardPage() {
       key: 'id',
       header: 'OS',
       render: (row) => (
-        <Text ff="monospace" size="sm" title={row.id}>
+        <Anchor component={Link} to={`/ordens-de-servico/${row.id}`} ff="monospace" size="sm" fw={500} title={row.id}>
           #{shortId(row.id)}
-        </Text>
+        </Anchor>
       ),
     },
     {
