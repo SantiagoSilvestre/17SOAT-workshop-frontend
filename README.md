@@ -1,7 +1,8 @@
 # Oficina 17SOAT · Frontend
 
 Interface web do **sistema de gestão de oficina mecânica** desenvolvido no curso 17SOAT. Ela consome a API do
-repositório [17SOAT-workshop-management-system](https://github.com/SystemIvan/17SOAT-workshop-management-system)
+repositório [17SOAT-workshop-management-system](https://github.com/SantiagoSilvestre/17SOAT-workshop-management-system),
+branch [`feat/platform-kubernetes-infrastructure-delivery`](https://github.com/SantiagoSilvestre/17SOAT-workshop-management-system/tree/feat/platform-kubernetes-infrastructure-delivery)
 (Spring Boot + MySQL) e cobre, de forma incremental, todas as funcionalidades da API: cadastros, ordens de serviço,
 orçamentos, execução, estoque, compras e relatórios.
 
@@ -25,6 +26,7 @@ orçamentos, execução, estoque, compras e relatórios.
 - [Autenticação e papéis](#autenticação-e-papéis)
 - [Catálogo de serviços](#catálogo-de-serviços)
 - [Clientes](#clientes)
+- [Veículos](#veículos)
 - [Estrutura do projeto](#estrutura-do-projeto)
 - [Scripts](#scripts)
 - [Testes e CI](#testes-e-ci)
@@ -36,7 +38,7 @@ orçamentos, execução, estoque, compras e relatórios.
 
 ## Situação atual
 
-A **fase 1** (fundação) está pronta e a **fase 2** (cadastros) já tem catálogo de serviços e clientes. Já funciona:
+A **fase 1** (fundação) está pronta e a **fase 2** (cadastros) já tem catálogo de serviços, clientes e veículos. Já funciona:
 
 - Login com usuário e senha usando o JWT emitido pelo backend (`POST /api/auth/login`).
 - Sessão persistida no navegador e encerrada automaticamente quando o token expira (1 hora, sem refresh no backend)
@@ -52,6 +54,8 @@ A **fase 1** (fundação) está pronta e a **fase 2** (cadastros) já tem catál
   (veja [Catálogo de serviços](#catálogo-de-serviços)).
 - **Clientes**: listar, buscar por nome, CPF/CNPJ ou e-mail, cadastrar com máscaras e validação de CPF/CNPJ,
   ver o detalhe, renomear, editar contato e endereço e arquivar (veja [Clientes](#clientes)).
+- **Veículos**: listar com o nome do dono, buscar pela placa com ou sem hífen, cadastrar (também a partir do
+  cliente), editar, registrar quilometragem e arquivar (veja [Veículos](#veículos)).
 
 Os demais módulos já aparecem no menu, com a etiqueta **Em breve** no painel, e ganham telas nas próximas fases
 (veja o [roteiro](#roteiro-de-entrega)).
@@ -106,23 +110,23 @@ simulador de fornecedor e o frontend.
 1. Clone os dois repositórios **lado a lado**:
 
    ```bash
-   git clone https://github.com/SystemIvan/17SOAT-workshop-management-system.git
+   git clone https://github.com/SantiagoSilvestre/17SOAT-workshop-management-system.git
    git clone https://github.com/SantiagoSilvestre/17SOAT-workshop-frontend.git
    ```
 
    ```
    pasta-de-trabalho/
-   ├── 17SOAT-workshop-management-system/   ← backend (use a branch dev, a mais atualizada)
+   ├── 17SOAT-workshop-management-system/   ← backend (branch feat/platform-kubernetes-infrastructure-delivery)
    └── 17SOAT-workshop-frontend/            ← este repositório
    ```
 
    > Se o backend estiver em outro lugar, informe o caminho em `BACKEND_PATH` no arquivo `.env`
    > (veja [Variáveis de ambiente](#variáveis-de-ambiente)).
 
-2. Na pasta do backend, use a branch de integração:
+2. Na pasta do backend, use a branch que o frontend acompanha (a mais atual):
 
    ```bash
-   cd 17SOAT-workshop-management-system && git checkout dev && cd ..
+   cd 17SOAT-workshop-management-system && git checkout feat/platform-kubernetes-infrastructure-delivery && cd ..
    ```
 
 3. Suba tudo a partir da pasta do frontend:
@@ -310,6 +314,39 @@ Telas em `/clientes` (lista), `/clientes/novo` (cadastro) e `/clientes/{id}` (de
 - **Arquivar** tira o cliente da lista e não tem volta pela API. O detalhe de um cliente arquivado continua
   acessível, só para consulta.
 - A busca da lista funciona com o documento com ou sem máscara (`529.982` ou `52998`).
+- O detalhe mostra os **veículos ativos do cliente**, com um atalho para cadastrar um novo já com o cliente
+  escolhido.
+
+## Veículos
+
+Telas em `/veiculos` (lista), `/veiculos/novo` (cadastro) e `/veiculos/{id}` (detalhe), para ADMIN e MANAGER.
+
+![Lista de veículos](docs/screenshots/veiculos.png)
+
+![Detalhe do veículo](docs/screenshots/veiculo-detalhe.png)
+
+| Ação                         | Endpoint                          |
+| ---------------------------- | --------------------------------- |
+| Listar veículos ativos       | `GET /api/vehicles`               |
+| Ver detalhe                  | `GET /api/vehicles/{id}`          |
+| Cadastrar                    | `POST /api/vehicles`              |
+| Editar marca, modelo, ano, cor e chassi | `PATCH /api/vehicles/{id}` |
+| Registrar quilometragem      | `PATCH /api/vehicles/{id}/mileage` |
+| Arquivar                     | `DELETE /api/vehicles/{id}`       |
+
+- **Placa**: aceita o formato antigo (`ABC-1234`) e o Mercosul (`ABC1D23`), em maiúsculas e com ou sem hífen,
+  como o `LicensePlate` do backend. A API recebe a placa sem hífen; a tela mostra a antiga com hífen.
+- **Validações iguais às do backend**: ano entre 1886 e o ano seguinte ao atual, chassi opcional com 17 letras ou
+  números, marca, modelo e cor obrigatórios.
+- **Placa ou chassi repetidos** e **cliente arquivado** (`409`) aparecem no próprio campo.
+- **Quilometragem** só aumenta: o formulário já recusa um valor menor que a leitura atual, e o `409` da API também
+  aparece no campo. No cadastro ela é opcional.
+- **Chassi na edição**: deixar o campo vazio mantém o chassi atual, porque a API não permite apagá-lo.
+- **Cliente**: a API devolve só o `customerId`. A lista cruza com a lista de clientes ativos para mostrar o nome,
+  e o detalhe busca o cliente pelo id (inclusive arquivado).
+- **Veículos do cliente**: a API não filtra por cliente, então o detalhe do cliente filtra a lista de ativos.
+  Veículos arquivados não aparecem ali; continuam acessíveis pelo link direto.
+- **Arquivar** tira o veículo da lista, impede novas ordens de serviço para ele e não tem volta pela API.
 
 ## Estrutura do projeto
 
@@ -325,7 +362,8 @@ Telas em `/clientes` (lista), `/clientes/novo` (cadastro) e `/clientes/{id}` (de
 │   │   ├── http.ts               # cliente HTTP: token, erros { code, message }, query params
 │   │   ├── auth.ts               # chamadas de autenticação
 │   │   ├── catalogServices.ts    # catálogo: chamadas, tipos e hooks do TanStack Query
-│   │   └── customers.ts          # clientes: chamadas, tipos e hooks
+│   │   ├── customers.ts          # clientes: chamadas, tipos e hooks
+│   │   └── vehicles.ts           # veículos: chamadas, tipos e hooks
 │   ├── auth/
 │   │   ├── roles.ts              # papéis e rótulos em português
 │   │   ├── token.ts              # leitura das claims do JWT
@@ -337,11 +375,13 @@ Telas em `/clientes` (lista), `/clientes/novo` (cadastro) e `/clientes/{id}` (de
 │   │   ├── DataTable.tsx         # tabela com busca, ordenação e paginação no cliente
 │   │   ├── ConfirmModal.tsx      # confirmação de ações como arquivar
 │   │   ├── MoneyInput.tsx        # campo de valor em reais
+│   │   ├── IntegerInput.tsx      # campo de número inteiro (ano, quilometragem)
 │   │   └── PageHeader.tsx        # título e descrição da página
 │   ├── features/
 │   │   ├── catalog/              # tela e formulário do catálogo de serviços
-│   │   └── customers/            # lista, cadastro, detalhe e modais de clientes
-│   ├── lib/                      # dinheiro, formatos brasileiros (CPF/CNPJ, telefone, CEP), texto e notificações
+│   │   ├── customers/            # lista, cadastro, detalhe e modais de clientes
+│   │   └── vehicles/             # lista, cadastro, detalhe e modais de veículos
+│   ├── lib/                      # dinheiro, formatos brasileiros (CPF/CNPJ, telefone, CEP, placa), texto e notificações
 │   ├── layout/AppLayout.tsx      # cabeçalho, menu lateral e área de conteúdo
 │   ├── pages/                    # Login, Painel, Acesso negado, 404, "Em breve"
 │   ├── routes/
@@ -383,7 +423,10 @@ Os testes usam Vitest + Testing Library com jsdom e cobrem:
   edição que chama só a rota do campo alterado e arquivamento com confirmação;
 - formatos brasileiros: máscaras e dígitos verificadores de CPF/CNPJ, telefone e CEP;
 - clientes: lista formatada e busca por documento, cadastro com endereço, validações, aviso e erro de documento
-  repetido, edição de contato só com o que mudou, renomear, cliente arquivado só para consulta e arquivamento.
+  repetido, edição de contato só com o que mudou, renomear, cliente arquivado só para consulta e arquivamento;
+- veículos: placa (antiga e Mercosul), chassi, ano e quilometragem; lista com nome do cliente e busca pela placa,
+  cadastro a partir do cliente com dados normalizados, validações e placa repetida, quilometragem que não diminui,
+  edição que mantém o chassi e veículos no detalhe do cliente.
 
 Os testes de tela simulam a API com `mockApi` ([`src/test/api.ts`](src/test/api.ts)), que responde por
 `MÉTODO /api/caminho` e guarda as chamadas feitas para o teste conferir o corpo enviado.
@@ -393,12 +436,12 @@ request e também verifica se a imagem Docker é construída.
 
 ## Como adicionar um módulo
 
-O catálogo de serviços e os clientes são o modelo. Para a tela de veículos, por exemplo:
+O catálogo de serviços, os clientes e os veículos são o modelo. Para a tela de técnicos, por exemplo:
 
-1. Crie `src/api/vehicles.ts` com os tipos, as chamadas (usando o cliente `http`) e os hooks do TanStack Query,
-   como em [`src/api/catalogServices.ts`](src/api/catalogServices.ts). Mutações invalidam a lista para ela recarregar.
-2. Crie a página em `src/features/vehicles/VehiclesPage.tsx` usando `DataTable`, `PageHeader`, `ConfirmModal` e
-   os helpers `notifySuccess`/`notifyError`.
+1. Crie `src/api/technicians.ts` com os tipos, as chamadas (usando o cliente `http`) e os hooks do TanStack Query,
+   como em [`src/api/vehicles.ts`](src/api/vehicles.ts). Mutações invalidam a lista para ela recarregar.
+2. Crie a página em `src/features/technicians/TechniciansPage.tsx` usando `DataTable`, `PageHeader`, `ConfirmModal`
+   e os helpers `notifySuccess`/`notifyError`.
 3. Em `src/routes/modules.ts`, aponte o campo `page` do módulo para a nova página. A rota, o menu e o painel passam a
    usá-la (sem `page`, a rota mostra "Em breve"). Se o módulo tiver subpáginas (cadastro, detalhe), o `page` é um
    componente com `<Routes>` próprio, como [`CustomersModule`](src/features/customers/CustomersModule.tsx).
@@ -411,7 +454,7 @@ O frontend é entregue em fases, na ordem do mapa de API para telas:
 | Fase | Conteúdo                                                                      | Situação     |
 | :--: | ----------------------------------------------------------------------------- | ------------ |
 |  1   | Fundação: projeto, Docker, login JWT, rotas por papel, layout                 | ✅ Pronta    |
-|  2   | Cadastros: clientes, veículos, catálogo de serviços, técnicos e usuários      | 🚧 Catálogo e clientes prontos; veículos, técnicos e usuários a seguir |
+|  2   | Cadastros: clientes, veículos, catálogo de serviços, técnicos e usuários      | 🚧 Catálogo, clientes e veículos prontos; técnicos e usuários a seguir |
 |  3   | Ordens de serviço (parte 1): abertura, listagem, diagnóstico, prioridade, acompanhamento | Planejada |
 |  4   | Orçamentos: geração, consulta e decisão                                       | Planejada    |
 |  5   | Execução e entrega: técnico, início, progresso, conclusão, finalização        | Planejada    |
@@ -429,7 +472,9 @@ O backend não está em `../17SOAT-workshop-management-system`. Clone-o ao lado 
 `BACKEND_PATH` no `.env`.
 
 **O login responde "Não foi possível conectar ao servidor" ou erro 502**
-A API ainda está subindo (o Spring Boot leva alguns segundos depois do MySQL ficar saudável). Acompanhe com
+A API ainda está subindo. Na opção 1 o frontend só sobe depois que o healthcheck da API
+(`/actuator/health/readiness`) responde, o que pode levar até 3 minutos na primeira vez; nas outras opções a API
+pode ainda não estar pronta. Acompanhe com
 `docker compose logs -f app` e tente de novo. Na opção 2, confira se a API responde em http://localhost:8080.
 
 **"Usuário ou senha inválidos" com os usuários de teste**

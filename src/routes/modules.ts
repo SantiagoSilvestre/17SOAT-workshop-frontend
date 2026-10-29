@@ -16,6 +16,7 @@ import {
 import { STAFF_ROLES, type Role } from '@/auth/roles';
 import { CatalogPage } from '@/features/catalog/CatalogPage';
 import { CustomersModule } from '@/features/customers/CustomersModule';
+import { VehiclesModule } from '@/features/vehicles/VehiclesModule';
 
 export interface AppModule {
   path: string;
@@ -63,6 +64,7 @@ export const MODULES: readonly AppModule[] = [
     icon: IconCar,
     roles: STAFF,
     phase: 2,
+    page: VehiclesModule,
   },
   {
     path: '/catalogo',

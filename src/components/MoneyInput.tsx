@@ -1,16 +1,17 @@
 import { NumberInput, type NumberInputProps } from '@mantine/core';
 
 type MoneyInputProps = Omit<NumberInputProps, 'value' | 'onChange'> & {
-  value: number | undefined;
-  onChange: (value: number | undefined) => void;
+  value: number | null | undefined;
+  /** Vazio vira null: com undefined o Controller voltaria a mostrar o valor padrão do formulário. */
+  onChange: (value: number | null) => void;
 };
 
 // Com casas decimais fixas o NumberInput devolve texto ("1234.50") para não perder os zeros.
-function toNumber(value: number | string): number | undefined {
+function toNumber(value: number | string): number | null {
   if (typeof value === 'number') return value;
-  if (value.trim() === '') return undefined;
+  if (value.trim() === '') return null;
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 /** Campo de valor em reais: vírgula decimal, ponto de milhar e sempre duas casas. */
