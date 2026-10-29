@@ -33,6 +33,18 @@ export const PRIORITY_LABELS: Record<Priority, string> = {
   URGENT: 'Urgente',
 };
 
+/** Situação de cada serviço da OS (ServiceExecutionStatus). */
+export const EXECUTION_STATUS_LABELS = {
+  PENDING: 'Aguardando aprovação',
+  AUTHORIZED: 'Aprovado',
+  REJECTED: 'Recusado',
+  AWAITING_ITEMS: 'Aguardando peças',
+  READY: 'Pronto para executar',
+  IN_PROGRESS: 'Em execução',
+  COMPLETED: 'Concluído',
+} as const;
+export type ExecutionStatus = keyof typeof EXECUTION_STATUS_LABELS;
+
 export interface StockRequirement {
   stockItemId: string;
   type: string;
@@ -49,7 +61,7 @@ export interface ServiceExecution {
   catalogServiceId: string;
   name: string;
   price: Money;
-  status: string;
+  status: ExecutionStatus;
   authorizedByEstimateId: string | null;
   assignedTechnicianId: string | null;
   diagnosedByTechnicianId: string | null;
@@ -106,6 +118,18 @@ export interface IntakeInput {
   services?: { catalogServiceId: string; parts: { stockItemId: string; quantity: number }[] }[];
 }
 
+/** Um serviço do catálogo no diagnóstico. O preço pode ser ajustado para este veículo. */
+export interface DiagnosisItemInput {
+  catalogServiceId: string;
+  name: string;
+  price: Money;
+}
+
+export interface DiagnosisInput {
+  diagnosedByTechnicianId: string;
+  items: DiagnosisItemInput[];
+}
+
 export interface IntakeResult {
   serviceOrder: ServiceOrder;
   customer: { id: string; created: boolean };
@@ -121,11 +145,16 @@ export const serviceOrdersApi = {
     http.get<ServiceOrder[]>(BASE, { query: { ...filters }, signal }),
   get: (id: string, signal?: AbortSignal) => http.get<ServiceOrder>(`${BASE}/${id}`, { signal }),
   intake: (input: IntakeInput) => http.post<IntakeResult>(`${BASE}/intake`, input),
+  changePriority: (id: string, priority: Priority) => http.patch<ServiceOrder>(`${BASE}/${id}/priority`, { priority }),
+  assignDiagnosisAssignee: (id: string, technicianId: string) =>
+    http.put<ServiceOrder>(`${BASE}/${id}/diagnosis-assignee`, { technicianId }),
+  performDiagnosis: (id: string, input: DiagnosisInput) => http.post<ServiceOrder>(`${BASE}/${id}/diagnosis`, input),
 };
 
 export const serviceOrderKeys = {
   all: ['service-orders'] as const,
   list: (filters: ServiceOrderFilters) => ['service-orders', 'list', filters] as const,
+  detail: (id: string) => ['service-orders', 'detail', id] as const,
 };
 
 export function useServiceOrders(filters: ServiceOrderFilters) {
@@ -134,6 +163,41 @@ export function useServiceOrders(filters: ServiceOrderFilters) {
     queryFn: ({ signal }) => serviceOrdersApi.list(filters, signal),
   });
 }
+
+export function useServiceOrder(id: string | undefined) {
+  return useQuery({
+    queryKey: serviceOrderKeys.detail(id ?? ''),
+    queryFn: ({ signal }) => serviceOrdersApi.get(id!, signal),
+    enabled: Boolean(id),
+  });
+}
+
+/** As ações da OS devolvem a OS atualizada: grava no detalhe e recarrega o painel. */
+function useServiceOrderAction<Variables>(action: (variables: Variables) => Promise<ServiceOrder>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: action,
+    onSuccess: (order) => {
+      queryClient.setQueryData(serviceOrderKeys.detail(order.id), order);
+      void queryClient.invalidateQueries({ queryKey: ['service-orders', 'list'] });
+    },
+  });
+}
+
+export const useChangePriority = () =>
+  useServiceOrderAction(({ id, priority }: { id: string; priority: Priority }) =>
+    serviceOrdersApi.changePriority(id, priority),
+  );
+
+export const useAssignDiagnosisAssignee = () =>
+  useServiceOrderAction(({ id, technicianId }: { id: string; technicianId: string }) =>
+    serviceOrdersApi.assignDiagnosisAssignee(id, technicianId),
+  );
+
+export const usePerformDiagnosis = () =>
+  useServiceOrderAction(({ id, input }: { id: string; input: DiagnosisInput }) =>
+    serviceOrdersApi.performDiagnosis(id, input),
+  );
 
 export function useIntake() {
   const queryClient = useQueryClient();

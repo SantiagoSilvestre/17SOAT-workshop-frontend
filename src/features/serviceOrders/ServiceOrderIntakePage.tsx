@@ -84,8 +84,11 @@ function IntakeResultView({ result, onAgain }: { result: IntakeResult; onAgain: 
           <Button variant="default" onClick={onAgain}>
             Abrir outra OS
           </Button>
-          <Button component={Link} to="/ordens-de-servico">
+          <Button variant="default" component={Link} to="/ordens-de-servico">
             Ir para o painel
+          </Button>
+          <Button component={Link} to={`/ordens-de-servico/${order.id}`}>
+            Ver OS
           </Button>
         </Group>
       </Stack>
